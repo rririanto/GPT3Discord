@@ -599,16 +599,14 @@ class Model:
         self._prompt_min_length = value
         SETTINGS_DB["prompt_min_length"] = value
 
-    def backoff_handler_http(details):
+    def backoff_handler_http(self):
         print(
-            f"Backing off {details['wait']:0.1f} seconds after {details['tries']} tries calling function {details['target']} | "
-            f"{details['exception'].status}: {details['exception'].message}"
+            f"Backing off {self['wait']:0.1f} seconds after {self['tries']} tries calling function {self['target']} | {self['exception'].status}: {self['exception'].message}"
         )
 
-    def backoff_handler_request(details):
+    def backoff_handler_request(self):
         print(
-            f"Backing off {details['wait']:0.1f} seconds after {details['tries']} tries calling function {details['target']} | "
-            f"{details['exception'].args[0]}"
+            f"Backing off {self['wait']:0.1f} seconds after {self['tries']} tries calling function {self['target']} | {self['exception'].args[0]}"
         )
 
     async def valid_text_request(self, response, model=None):
@@ -621,9 +619,7 @@ class Model:
                     completion_tokens=int(response["usage"]["completion_tokens"]),
                     gpt4=True,
                 )
-            if model and model in Models.EDIT_MODELS:
-                pass
-            else:
+            if not model or model not in Models.EDIT_MODELS:
                 await self.usage_service.update_usage(tokens_used)
         except Exception as e:
             traceback.print_exc()
@@ -651,7 +647,7 @@ class Model:
             }
             headers = {
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.openai_key if not custom_api_key else custom_api_key}",
+                "Authorization": f"Bearer {custom_api_key or self.openai_key}",
             }
             async with session.post(
                 "https://api.openai.com/v1/embeddings", json=payload, headers=headers
@@ -696,7 +692,7 @@ class Model:
             }
             headers = {
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.openai_key if not custom_api_key else custom_api_key}",
+                "Authorization": f"Bearer {custom_api_key or self.openai_key}",
             }
             async with session.post(
                 "https://api.openai.com/v1/edits", json=payload, headers=headers
@@ -740,15 +736,10 @@ class Model:
         """
         Sends a summary request to the OpenAI API
         """
-        summary_request_text = []
-        summary_request_text.append(
-            "The following is a conversation instruction set and a conversation between two people, a <username>, and GPTie."
-            " Firstly, determine the <username>'s name from the conversation history, then summarize the conversation."
-            " Do not summarize the instructions for GPTie, only the conversation. Summarize the conversation in a detailed fashion. If <username> mentioned"
-            " their name, be sure to mention it in the summary. Pay close attention to things the <username> has told you, such as personal details."
-        )
-        summary_request_text.append(prompt + "\nDetailed summary of conversation: \n")
-
+        summary_request_text = [
+            "The following is a conversation instruction set and a conversation between two people, a <username>, and GPTie. Firstly, determine the <username>'s name from the conversation history, then summarize the conversation. Do not summarize the instructions for GPTie, only the conversation. Summarize the conversation in a detailed fashion. If <username> mentioned their name, be sure to mention it in the summary. Pay close attention to things the <username> has told you, such as personal details.",
+            prompt + "\nDetailed summary of conversation: \n",
+        ]
         summary_request_text = "".join(summary_request_text)
 
         tokens = self.usage_service.count_tokens(summary_request_text)
@@ -766,7 +757,7 @@ class Model:
             }
             headers = {
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.openai_key if not custom_api_key else custom_api_key}",
+                "Authorization": f"Bearer {custom_api_key or self.openai_key}",
             }
             async with session.post(
                 "https://api.openai.com/v1/completions", json=payload, headers=headers
@@ -909,10 +900,12 @@ class Model:
         print(f"Messages -> {messages}")
         async with aiohttp.ClientSession(raise_for_status=False) as session:
             payload = {
-                "model": self.model if not model else model,
+                "model": model or self.model,
                 "messages": messages,
                 "stop": "" if stop is None else stop,
-                "temperature": self.temp if temp_override is None else temp_override,
+                "temperature": self.temp
+                if temp_override is None
+                else temp_override,
                 "top_p": self.top_p if top_p_override is None else top_p_override,
                 "presence_penalty": self.presence_penalty
                 if presence_penalty_override is None
@@ -921,9 +914,7 @@ class Model:
                 if frequency_penalty_override is None
                 else frequency_penalty_override,
             }
-            headers = {
-                "Authorization": f"Bearer {self.openai_key if not custom_api_key else custom_api_key}"
-            }
+            headers = {"Authorization": f"Bearer {custom_api_key or self.openai_key}"}
             if self.openai_organization:
                 headers["OpenAI-Organization"] = self.openai_organization
 
@@ -976,13 +967,7 @@ class Model:
             if temperature_override:
                 data.add_field("temperature", temperature_override)
 
-            async with session.post(
-                "https://api.openai.com/v1/audio/transcriptions",
-                headers={
-                    "Authorization": f"Bearer {self.openai_key if not custom_api_key else custom_api_key}",
-                },
-                data=data,
-            ) as resp:
+            async with session.post("https://api.openai.com/v1/audio/transcriptions", headers={"Authorization": f"Bearer {custom_api_key or self.openai_key}"}, data=data) as resp:
                 response = await resp.json()
                 return response["text"]
 
@@ -1011,17 +996,16 @@ class Model:
     ):  # The response, and a boolean indicating whether or not the context limit was reached.
         # Validate that  all the parameters are in a good state before we send the request
 
-        if not max_tokens_override:
-            if (
-                model
-                and model not in Models.GPT4_MODELS
-                and model not in Models.CHATGPT_MODELS
-            ):
-                max_tokens_override = Models.get_max_tokens(model) - tokens
+        if not max_tokens_override and (
+            model
+            and model not in Models.GPT4_MODELS
+            and model not in Models.CHATGPT_MODELS
+        ):
+            max_tokens_override = Models.get_max_tokens(model) - tokens
 
         print(f"The prompt about to be sent is {prompt}")
         print(
-            f"Overrides -> temp:{temp_override}, top_p:{top_p_override} frequency:{frequency_penalty_override}, presence:{presence_penalty_override}, model:{model if model else 'none'}, stop:{stop}"
+            f"Overrides -> temp:{temp_override}, top_p:{top_p_override} frequency:{frequency_penalty_override}, presence:{presence_penalty_override}, model:{model or 'none'}, stop:{stop}"
         )
 
         # Non-ChatGPT simple completion models.
@@ -1034,7 +1018,9 @@ class Model:
                     "temperature": self.temp
                     if temp_override is None
                     else temp_override,
-                    "top_p": self.top_p if top_p_override is None else top_p_override,
+                    "top_p": self.top_p
+                    if top_p_override is None
+                    else top_p_override,
                     "max_tokens": self.max_tokens - tokens
                     if max_tokens_override is None
                     else max_tokens_override,
@@ -1044,13 +1030,9 @@ class Model:
                     "frequency_penalty": self.frequency_penalty
                     if frequency_penalty_override is None
                     else frequency_penalty_override,
-                    "best_of": self.best_of
-                    if not best_of_override
-                    else best_of_override,
+                    "best_of": best_of_override or self.best_of,
                 }
-                headers = {
-                    "Authorization": f"Bearer {self.openai_key if not custom_api_key else custom_api_key}"
-                }
+                headers = {"Authorization": f"Bearer {custom_api_key or self.openai_key}"}
                 async with session.post(
                     "https://api.openai.com/v1/completions",
                     json=payload,
@@ -1068,13 +1050,15 @@ class Model:
         else:  # ChatGPT/GPT4 Simple completion
             async with aiohttp.ClientSession(raise_for_status=False) as session:
                 payload = {
-                    "model": self.model if not model else model,
+                    "model": model or self.model,
                     "messages": [{"role": "user", "content": prompt}],
                     "stop": "" if stop is None else stop,
                     "temperature": self.temp
                     if temp_override is None
                     else temp_override,
-                    "top_p": self.top_p if top_p_override is None else top_p_override,
+                    "top_p": self.top_p
+                    if top_p_override is None
+                    else top_p_override,
                     "presence_penalty": self.presence_penalty
                     if presence_penalty_override is None
                     else presence_penalty_override,
@@ -1082,9 +1066,7 @@ class Model:
                     if frequency_penalty_override is None
                     else frequency_penalty_override,
                 }
-                headers = {
-                    "Authorization": f"Bearer {self.openai_key if not custom_api_key else custom_api_key}"
-                }
+                headers = {"Authorization": f"Bearer {custom_api_key or self.openai_key}"}
                 if self.openai_organization:
                     headers["OpenAI-Organization"] = self.openai_organization
                 async with session.post(
@@ -1139,8 +1121,7 @@ class Model:
         words = len(prompt.split(" "))
         if words < 1 or words > 75:
             raise ValueError(
-                "Prompt must be greater than 1 word and less than 75, it is currently "
-                + str(words)
+                f"Prompt must be greater than 1 word and less than 75, it is currently {words}"
             )
 
         # print("The prompt about to be sent is " + prompt)
@@ -1152,7 +1133,7 @@ class Model:
             payload = {"prompt": prompt, "n": self.num_images, "size": self.image_size}
             headers = {
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.openai_key if not custom_api_key else custom_api_key}",
+                "Authorization": f"Bearer {custom_api_key or self.openai_key}",
             }
             async with aiohttp.ClientSession(raise_for_status=True) as session:
                 async with session.post(
@@ -1172,21 +1153,12 @@ class Model:
                         "image", f, filename="file.png", content_type="image/png"
                     )
 
-                    async with session.post(
-                        "https://api.openai.com/v1/images/variations",
-                        headers={
-                            "Authorization": f"Bearer {self.openai_key if not custom_api_key else custom_api_key}",
-                        },
-                        data=data,
-                    ) as resp:
+                    async with session.post("https://api.openai.com/v1/images/variations", headers={"Authorization": f"Bearer {custom_api_key or self.openai_key}"}, data=data) as resp:
                         response = await resp.json()
 
         print(response)
 
-        image_urls = []
-        for result in response["data"]:
-            image_urls.append(result["url"])
-
+        image_urls = [result["url"] for result in response["data"]]
         # For each image url, open it as an image object using PIL
         images = await asyncio.get_running_loop().run_in_executor(
             None,
@@ -1260,14 +1232,12 @@ class Model:
 
         # Print the filesize of new_im, in mega bytes
         image_size = os.path.getsize(temp_file.name) / 1048576
-        if ctx.guild is None:
-            guild_file_limit = 8
-        else:
-            guild_file_limit = ctx.guild.filesize_limit / 1048576
-
         # If the image size is greater than 8MB, we can't return this to the user, so we will need to downscale the
         # image and try again
         safety_counter = 0
+        guild_file_limit = (
+            8 if ctx.guild is None else ctx.guild.filesize_limit / 1048576
+        )
         while image_size > guild_file_limit:
             safety_counter += 1
             if safety_counter >= 3:

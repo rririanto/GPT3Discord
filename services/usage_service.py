@@ -25,11 +25,9 @@ class UsageService:
     ):
         tokens_used = int(tokens_used)
         if chatgpt:
-            price = (tokens_used / 1000) * 0.002
-            return price
+            return (tokens_used / 1000) * 0.002
         elif gpt4:
-            price = (prompt_tokens / 1000) * 0.03 + (completion_tokens / 1000) * 0.06
-            return price
+            return (prompt_tokens / 1000) * 0.03 + (completion_tokens / 1000) * 0.06
         elif not embeddings:
             price = (tokens_used / 1000) * 0.02
         else:
@@ -56,7 +54,7 @@ class UsageService:
             price = (tokens_used / 1000) * 0.0004
         usage = await self.get_usage()
         print(
-            f"Cost -> Old: {str(usage)} | New: {str(usage + float(price))}, used {str(float(price))} credits"
+            f"Cost -> Old: {str(usage)} | New: {str(usage + float(price))}, used {float(price)} credits"
         )
         # Do the same as above but with aiofiles
         async with aiofiles.open(self.usage_file_path, "w") as f:

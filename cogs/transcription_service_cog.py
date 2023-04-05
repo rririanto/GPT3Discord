@@ -53,8 +53,8 @@ class TranscribeService(discord.Cog, name="TranscribeService"):
             yt = YouTube(link)
 
             # Delete audiotemp/{str(ctx.user.id)}temp.mp3 if it already exists
-            if Path("audiotemp/{}temp.mp3".format(str(ctx.user.id))).exists():
-                Path("audiotemp/{}temp.mp3".format(str(ctx.user.id))).unlink()
+            if Path(f"audiotemp/{str(ctx.user.id)}temp.mp3").exists():
+                Path(f"audiotemp/{str(ctx.user.id)}temp.mp3").unlink()
             print("before call")
             try:
                 file_path = await asyncio.get_running_loop().run_in_executor(
@@ -62,7 +62,7 @@ class TranscribeService(discord.Cog, name="TranscribeService"):
                     partial(
                         yt.streams.filter().first().download,
                         output_path="audiotemp",
-                        filename="{}temp".format(str(ctx.user.id)),
+                        filename=f"{str(ctx.user.id)}temp",
                     ),
                 )
             except Exception as e:
@@ -73,7 +73,7 @@ class TranscribeService(discord.Cog, name="TranscribeService"):
                 )
                 return
 
-            print("after call the file path was" + file_path)
+            print(f"after call the file path was{file_path}")
         else:
             await ctx.respond(
                 "Please upload a valid youtube link. Other links are not implemented yet"
@@ -97,14 +97,13 @@ class TranscribeService(discord.Cog, name="TranscribeService"):
                 # Chunk the response into 2048 character chunks, each an embed page
                 chunks = [response[i : i + 2048] for i in range(0, len(response), 2048)]
                 embed_pages = []
-                for chunk in chunks:
-                    embed_pages.append(
-                        discord.Embed(
-                            title="Transcription Page {}".format(len(embed_pages) + 1),
-                            description=chunk,
-                        )
+                embed_pages.extend(
+                    discord.Embed(
+                        title=f"Transcription Page {len(embed_pages) + 1}",
+                        description=chunk,
                     )
-
+                    for chunk in chunks
+                )
                 paginator = pages.Paginator(
                     pages=embed_pages,
                     timeout=None,
@@ -164,14 +163,13 @@ class TranscribeService(discord.Cog, name="TranscribeService"):
                 # Chunk the response into 2048 character chunks, each an embed page
                 chunks = [response[i : i + 2048] for i in range(0, len(response), 2048)]
                 embed_pages = []
-                for chunk in chunks:
-                    embed_pages.append(
-                        discord.Embed(
-                            title="Transcription Page {}".format(len(embed_pages) + 1),
-                            description=chunk,
-                        )
+                embed_pages.extend(
+                    discord.Embed(
+                        title=f"Transcription Page {len(embed_pages) + 1}",
+                        description=chunk,
                     )
-
+                    for chunk in chunks
+                )
                 paginator = pages.Paginator(
                     pages=embed_pages,
                     timeout=None,

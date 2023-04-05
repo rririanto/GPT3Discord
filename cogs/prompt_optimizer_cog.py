@@ -79,9 +79,10 @@ class ImgPromptOptimizer(discord.Cog, name="ImgPromptOptimizer"):
             final_prompt += "."
 
         # Check the opener for bad content.
-        if PRE_MODERATE:
-            if await Moderation.simple_moderate_and_respond(prompt, ctx):
-                return
+        if PRE_MODERATE and await Moderation.simple_moderate_and_respond(
+            prompt, ctx
+        ):
+            return
 
         # Get the token amount for the prompt
         # tokens = self.usage_service.count_tokens(final_prompt)
@@ -105,12 +106,12 @@ class ImgPromptOptimizer(discord.Cog, name="ImgPromptOptimizer"):
             # also relatively cost-effective
 
             response_text = (
-                str(response["choices"][0]["text"])
-                if not (
+                response["choices"][0]["message"]["content"]
+                if (
                     self.model.model in Models.CHATGPT_MODELS
                     or self.model.model in Models.GPT4_MODELS
                 )
-                else response["choices"][0]["message"]["content"]
+                else str(response["choices"][0]["text"])
             )
 
             # escape any mentions
@@ -130,11 +131,7 @@ class ImgPromptOptimizer(discord.Cog, name="ImgPromptOptimizer"):
                 .replace("Output:", "")
             )
 
-            self.converser_cog.users_to_interactions[user.id] = []
-            self.converser_cog.users_to_interactions[user.id].append(
-                response_message.id
-            )
-
+            self.converser_cog.users_to_interactions[user.id] = [response_message.id]
             self.converser_cog.redo_users[user.id] = RedoUser(
                 prompt=final_prompt,
                 message=ctx,
@@ -153,12 +150,10 @@ class ImgPromptOptimizer(discord.Cog, name="ImgPromptOptimizer"):
                 )
             )
 
-        # Catch the value errors raised by the Model object
         except ValueError as e:
             await ctx.respond(e)
             return
 
-        # Catch all other errors, we want this to keep going if it errors out.
         except Exception as e:
             await ctx.respond("Something went wrong, please try again later")
             await ctx.send_followup(e)

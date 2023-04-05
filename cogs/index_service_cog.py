@@ -168,7 +168,7 @@ class IndexService(discord.Cog, name="IndexService"):
             await self.index_handler.set_file_index(
                 ctx, file, user_api_key=user_api_key
             )
-        elif link:
+        else:
             await self.index_handler.set_link_index(
                 ctx, link, user_api_key=user_api_key
             )
@@ -272,9 +272,10 @@ class IndexService(discord.Cog, name="IndexService"):
                 return
 
         # Check the opener for bad content.
-        if PRE_MODERATE:
-            if await Moderation.simple_moderate_and_respond(query, ctx):
-                return
+        if PRE_MODERATE and await Moderation.simple_moderate_and_respond(
+            query, ctx
+        ):
+            return
 
         await self.index_handler.query(
             ctx, query, response_mode, nodes, user_api_key, child_branch_factor
