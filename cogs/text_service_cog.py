@@ -29,11 +29,7 @@ from services.text_service import SetupModal, TextService
 
 original_message = {}
 ALLOWED_GUILDS = EnvService.get_allowed_guilds()
-if sys.platform == "win32":
-    separator = "\\"
-else:
-    separator = "/"
-
+separator = "\\" if sys.platform == "win32" else "/"
 #
 # Get the user key service if it is enabled.
 #
@@ -193,32 +189,31 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
     @discord.Cog.listener()
     async def on_member_join(self, member):
         """When members join send welcome message if enabled"""
-        if self.model.welcome_message_enabled:
-            query = f"Please generate a welcome message for {member.name} who has just joined the server."
+        if not self.model.welcome_message_enabled:
+            return
+        query = f"Please generate a welcome message for {member.name} who has just joined the server."
 
-            try:
-                welcome_message_response = await self.model.send_request(
-                    query,
-                    tokens=self.usage_service.count_tokens(query),
-                    is_chatgpt_request=True
-                    if "turbo" in str(self.model.model)
-                    else False,
-                )
-                welcome_message = str(welcome_message_response["choices"][0]["text"])
-            except Exception:
-                welcome_message = None
-
-            if not welcome_message:
-                welcome_message = EnvService.get_welcome_message()
-            welcome_embed = discord.Embed(
-                title=f"Welcome, {member.name}!", description=welcome_message
+        try:
+            welcome_message_response = await self.model.send_request(
+                query,
+                tokens=self.usage_service.count_tokens(query),
+                is_chatgpt_request="turbo" in str(self.model.model),
             )
+            welcome_message = str(welcome_message_response["choices"][0]["text"])
+        except Exception:
+            welcome_message = None
 
-            welcome_embed.add_field(
-                name="Just so you know...",
-                value="> My commands are invoked with a forward slash (/)\n> Use /help to see my help message(s).",
-            )
-            await member.send(content=None, embed=welcome_embed)
+        if not welcome_message:
+            welcome_message = EnvService.get_welcome_message()
+        welcome_embed = discord.Embed(
+            title=f"Welcome, {member.name}!", description=welcome_message
+        )
+
+        welcome_embed.add_field(
+            name="Just so you know...",
+            value="> My commands are invoked with a forward slash (/)\n> Use /help to see my help message(s).",
+        )
+        await member.send(content=None, embed=welcome_embed)
 
     @discord.Cog.listener()
     async def on_ready(self):
@@ -306,15 +301,9 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
         self, ctx, opener_user_id=None, conversation_limit=False
     ):
         """end the thread of the user interacting with the bot, if the conversation has reached the limit close it for the owner"""
-        normalized_user_id = opener_user_id if opener_user_id else ctx.author.id
-        # Check if the channel is an instance of a thread
-        thread = False
-        if isinstance(ctx.channel, discord.Thread):
-            thread = True
-
-        if (
-            conversation_limit
-        ):  # if we reach the conversation limit we want to close from the channel it was maxed out in
+        normalized_user_id = opener_user_id or ctx.author.id
+        thread = isinstance(ctx.channel, discord.Thread)
+        if conversation_limit:  # if we reach the conversation limit we want to close from the channel it was maxed out in
             channel_id = ctx.channel.id
         else:
             try:
@@ -329,7 +318,7 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
                 if normalized_user_id in self.awaiting_responses:
                     await ctx.reply(
                         embed=discord.Embed(
-                            title=f"Please wait for a response before ending the conversation.",
+                            title="Please wait for a response before ending the conversation.",
                             color=0x808080,
                         )
                     )
@@ -394,21 +383,20 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
                         traceback.print_exc()
             except Exception:
                 traceback.print_exc()
-        else:
-            if normalized_user_id in self.conversation_thread_owners:
-                thread_id = ctx.channel.id
-                self.conversation_thread_owners[normalized_user_id].remove(
-                    ctx.channel.id
-                )
+        elif normalized_user_id in self.conversation_thread_owners:
+            thread_id = ctx.channel.id
+            self.conversation_thread_owners[normalized_user_id].remove(
+                ctx.channel.id
+            )
 
-                # Attempt to close and lock the thread.
-                if thread:
-                    try:
-                        thread = await self.bot.fetch_channel(thread_id)
-                        await thread.edit(name="Closed-GPT")
-                        await thread.edit(archived=True)
-                    except Exception:
-                        traceback.print_exc()
+            # Attempt to close and lock the thread.
+            if thread:
+                try:
+                    thread = await self.bot.fetch_channel(thread_id)
+                    await thread.edit(name="Closed-GPT")
+                    await thread.edit(archived=True)
+                except Exception:
+                    traceback.print_exc()
 
     async def send_settings_text(self, ctx):
         """compose and return the settings menu to the interacting user"""
@@ -451,9 +439,7 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
             try:
                 # Set the parameter to the value
                 setattr(self.model, parameter, value)
-                await ctx.respond(
-                    "Successfully set the parameter " + parameter + " to " + value
-                )
+                await ctx.respond(f"Successfully set the parameter {parameter} to {value}")
 
                 if parameter == "mode":
                     await ctx.send_followup(
@@ -493,11 +479,10 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
                 else:
                     await ctx.reply(chunk)
                 first = True
+            elif from_context:
+                response_message = await ctx.send_followup(chunk)
             else:
-                if from_context:
-                    response_message = await ctx.send_followup(chunk)
-                else:
-                    response_message = await ctx.channel.send(chunk)
+                response_message = await ctx.channel.send(chunk)
         return response_message
 
     async def paginate_embed(self, response_text):
@@ -512,16 +497,11 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
         # Send each chunk as a message
         for count, chunk in enumerate(response_text, start=1):
             if not first:
-                page = discord.Embed(
-                    title=f"Page {count}",
-                    description=chunk,
-                )
                 first = True
-            else:
-                page = discord.Embed(
-                    title=f"Page {count}",
-                    description=chunk,
-                )
+            page = discord.Embed(
+                title=f"Page {count}",
+                description=chunk,
+            )
             pages.append(page)
 
         return pages
@@ -568,23 +548,21 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
         except Exception as e:
             traceback.print_exc()
             await self.message_queue.put(
-                Message("Error sending debug message: " + str(e), debug_channel)
+                Message(f"Error sending debug message: {str(e)}", debug_channel)
             )
 
     async def check_conversation_limit(self, message):
         """Check if a conversation has reached the set limit and end it if it has"""
         # After each response, check if the user has reached the conversation limit in terms of messages or time.
-        if message.channel.id in self.conversation_threads:
-            # If the user has reached the max conversation length, end the conversation
-            if (
-                self.conversation_threads[message.channel.id].count
-                >= self.model.max_conversation_length
-            ):
-                await message.reply(
-                    "You have reached the maximum conversation length. You have ended the conversation with GPT3, and it has ended."
-                )
-                await self.end_conversation(message, conversation_limit=True)
-                return True
+        if message.channel.id in self.conversation_threads and (
+            self.conversation_threads[message.channel.id].count
+            >= self.model.max_conversation_length
+        ):
+            await message.reply(
+                "You have reached the maximum conversation length. You have ended the conversation with GPT3, and it has ended."
+            )
+            await self.end_conversation(message, conversation_limit=True)
+            return True
         return False
 
     async def summarize_conversation(self, message, prompt):
@@ -592,10 +570,9 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
         response = await self.model.send_summary_request(prompt)
         summarized_text = response["choices"][0]["text"]
 
-        new_conversation_history = []
-        new_conversation_history.append(
+        new_conversation_history = [
             EmbeddedConversationItem(self.CONVERSATION_STARTER_TEXT, 0)
-        )
+        ]
         new_conversation_history.append(
             EmbeddedConversationItem(
                 f"\nThis conversation has some context from earlier, which has been summarized as follows: {summarized_text} \nContinue the conversation, paying very close attention to things <username> told you, such as their name, and personal details.",
@@ -620,18 +597,17 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
             return
 
         # Moderation
-        if not isinstance(after.channel, discord.DMChannel):
-            if (
-                after.guild.id in Moderation.moderation_queues
-                and Moderation.moderation_queues[after.guild.id] is not None
-            ):
-                # Create a timestamp that is 0.25 seconds from now
-                timestamp = (
-                    datetime.datetime.now() + datetime.timedelta(seconds=0.25)
-                ).timestamp()
-                await Moderation.moderation_queues[after.guild.id].put(
-                    Moderation(after, timestamp)
-                )  # TODO Don't proceed if message was deleted!
+        if not isinstance(after.channel, discord.DMChannel) and (
+            after.guild.id in Moderation.moderation_queues
+            and Moderation.moderation_queues[after.guild.id] is not None
+        ):
+            # Create a timestamp that is 0.25 seconds from now
+            timestamp = (
+                datetime.datetime.now() + datetime.timedelta(seconds=0.25)
+            ).timestamp()
+            await Moderation.moderation_queues[after.guild.id].put(
+                Moderation(after, timestamp)
+            )  # TODO Don't proceed if message was deleted!
 
         await TextService.process_conversation_edit(self, after, original_message)
 
@@ -654,9 +630,9 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
             # Don't moderate if there is no "roles" attribute for the author
             if not hasattr(message.author, "roles"):
                 pass
-            # Verify that the user is not in a role that can bypass moderation
-            elif CHAT_BYPASS_ROLES is [None] or not any(
-                role.name.lower() in CHAT_BYPASS_ROLES for role in message.author.roles
+            elif CHAT_BYPASS_ROLES is [None] or all(
+                role.name.lower() not in CHAT_BYPASS_ROLES
+                for role in message.author.roles
             ):
                 # Create a timestamp that is 0.5 seconds from now
                 timestamp = (
@@ -667,12 +643,15 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
                 )
 
         # Language check
-        if FORCE_ENGLISH and len(message.content.split(" ")) > 3:
-            if not await Moderation.force_english_and_respond(
+        if (
+            FORCE_ENGLISH
+            and len(message.content.split(" ")) > 3
+            and not await Moderation.force_english_and_respond(
                 message.content, self.LANGUAGE_DETECT_STARTER_TEXT, message
-            ):
-                await message.delete()
-                return
+            )
+        ):
+            await message.delete()
+            return
 
         # Process the message if the user is in a conversation
         if await TextService.process_conversation_message(
@@ -688,8 +667,9 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
                 return
 
             # Check if any of the message author's role names are in BOT_TAGGABLE_ROLES, if not, return
-            if BOT_TAGGABLE_ROLES != [None] and not any(
-                role.name.lower() in BOT_TAGGABLE_ROLES for role in message.author.roles
+            if BOT_TAGGABLE_ROLES != [None] and all(
+                role.name.lower() not in BOT_TAGGABLE_ROLES
+                for role in message.author.roles
             ):
                 return
 
@@ -728,9 +708,12 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
         """Remove user from ask/edit command response wait, if not any of those then process the id to remove user from thread response wait"""
         if author_id in self.awaiting_responses:
             self.awaiting_responses.remove(author_id)
-        if not from_ask_command and not from_edit_command:
-            if channel_id in self.awaiting_thread_responses:
-                self.awaiting_thread_responses.remove(channel_id)
+        if (
+            not from_ask_command
+            and not from_edit_command
+            and channel_id in self.awaiting_thread_responses
+        ):
+            self.awaiting_thread_responses.remove(channel_id)
 
     async def mention_to_username(self, ctx, message):
         """replaces discord mentions with their server nickname in text, if the user is not found keep the mention as is"""
@@ -822,7 +805,7 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
 
         # Attempt to convert the input usage value into a float
         try:
-            usage = float(usage_amount)
+            usage = usage_amount
             await self.usage_service.set_usage(usage)
             await ctx.respond(f"Set the usage to {usage}")
         except Exception:
@@ -858,7 +841,7 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
         )
         embed.add_field(
             name="Total price",
-            value="$" + str(round(await self.usage_service.get_usage(), 2)),
+            value=f"${str(round(await self.usage_service.get_usage(), 2))}",
             inline=False,
         )
         await ctx.respond(embed=embed)
@@ -909,9 +892,10 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
         await ctx.defer(ephemeral=private) if is_context else None
 
         # If premoderation is enabled, check
-        if PRE_MODERATE:
-            if await Moderation.simple_moderate_and_respond(prompt, ctx):
-                return
+        if PRE_MODERATE and await Moderation.simple_moderate_and_respond(
+            prompt, ctx
+        ):
+            return
 
         overrides = Override(temperature, top_p, frequency_penalty, presence_penalty)
 
@@ -967,9 +951,10 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
 
         await ctx.defer(ephemeral=private)
 
-        if PRE_MODERATE:
-            if await Moderation.simple_moderate_and_respond(instruction + text, ctx):
-                return
+        if PRE_MODERATE and await Moderation.simple_moderate_and_respond(
+            instruction + text, ctx
+        ):
+            return
 
         overrides = Override(temperature, top_p, 0, 0)
 
@@ -989,7 +974,7 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
         await ctx.defer(ephemeral=True)
         await ctx.respond("Your private test thread")
         thread = await ctx.channel.create_thread(
-            name=ctx.user.name + "'s private test conversation",
+            name=f"{ctx.user.name}'s private test conversation",
             auto_archive_duration=60,
         )
         await thread.send(
@@ -1036,13 +1021,16 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
 
         if private:
             await ctx.defer(ephemeral=True)
-        elif not private:
+        else:
             await ctx.defer()
 
         # Check the opener for bad content.
-        if PRE_MODERATE and opener is not None:
-            if await Moderation.simple_moderate_and_respond(opener, ctx):
-                return
+        if (
+            PRE_MODERATE
+            and opener is not None
+            and await Moderation.simple_moderate_and_respond(opener, ctx)
+        ):
+            return
 
         if use_threads:
             if private:
@@ -1051,17 +1039,16 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
                     name=embed_title,
                     auto_archive_duration=60,
                 )
-                target = thread
             else:
                 embed_title = f"{user.name}'s conversation with GPT"
                 message_embed = discord.Embed(title=embed_title, color=0x808080)
                 message_thread = await ctx.send(embed=message_embed)
                 thread = await message_thread.create_thread(
-                    name=user.name + "'s conversation with GPT",
+                    name=f"{user.name}'s conversation with GPT",
                     auto_archive_duration=60,
                 )
                 await ctx.respond("Conversation started.")
-                target = thread
+            target = thread
         else:
             # Check if this current channel is already in a conversation
             if ctx.channel.id in self.conversation_threads:
@@ -1072,12 +1059,17 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
 
             # Check if the user is permitted to start a conversation in full channels
             # check if any of the user role names match CHANNEL_CHAT_ROLES
-            if CHANNEL_CHAT_ROLES and CHANNEL_CHAT_ROLES != [None]:
-                if not any(role.name in CHANNEL_CHAT_ROLES for role in ctx.user.roles):
-                    await ctx.respond(
-                        "You are not permitted to start a conversation in this channel."
-                    )
-                    return
+            if (
+                CHANNEL_CHAT_ROLES
+                and CHANNEL_CHAT_ROLES != [None]
+                and all(
+                    role.name not in CHANNEL_CHAT_ROLES for role in ctx.user.roles
+                )
+            ):
+                await ctx.respond(
+                    "You are not permitted to start a conversation in this channel."
+                )
+                return
 
             target = ctx.channel
             if private:
@@ -1089,9 +1081,7 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
             await ctx.respond(embed=embed)
 
         self.conversation_threads[target.id] = Thread(target.id)
-        self.conversation_threads[target.id].model = (
-            self.model.model if not model else model
-        )
+        self.conversation_threads[target.id].model = model or self.model.model
 
         # Set the overrides for the conversation
         self.conversation_threads[target.id].set_overrides(
@@ -1101,61 +1091,52 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
         if opener:
             opener = await self.mention_to_username(ctx, opener)
 
-        if not opener and not opener_file:
-            user_id_normalized = user.id
-        else:
-            user_id_normalized = ctx.author.id
-            if not opener_file:
-                pass
+        user_id_normalized = ctx.author.id if opener or opener_file else user.id
+        if opener_file:
+            if not opener_file.endswith((".txt", ".json")):
+                opener_file = (
+                    None  # Just start a regular thread if the file fails to load
+                )
             else:
-                if not opener_file.endswith((".txt", ".json")):
-                    opener_file = (
-                        None  # Just start a regular thread if the file fails to load
-                    )
-                else:
                     # Load the file and read it into opener
-                    try:
-                        opener_file = re.sub(
-                            ".+(?=[\\//])", "", opener_file
-                        )  # remove paths from the opener file
-                        opener_file = EnvService.find_shared_file(
-                            f"openers{separator}{opener_file}"
+                try:
+                    opener_file = re.sub(
+                        ".+(?=[\\//])", "", opener_file
+                    )  # remove paths from the opener file
+                    opener_file = EnvService.find_shared_file(
+                        f"openers{separator}{opener_file}"
+                    )
+                    opener_file = await self.load_file(opener_file, ctx)
+                    try:  # Try opening as json, if it fails it'll just pass the whole txt or json to the opener
+                        opener_file = json.loads(opener_file)
+                        temperature = opener_file.get("temperature", None)
+                        top_p = opener_file.get("top_p", None)
+                        frequency_penalty = opener_file.get(
+                            "frequency_penalty", None
                         )
-                        opener_file = await self.load_file(opener_file, ctx)
-                        try:  # Try opening as json, if it fails it'll just pass the whole txt or json to the opener
-                            opener_file = json.loads(opener_file)
-                            temperature = opener_file.get("temperature", None)
-                            top_p = opener_file.get("top_p", None)
-                            frequency_penalty = opener_file.get(
-                                "frequency_penalty", None
+                        presence_penalty = opener_file.get("presence_penalty", None)
+                        self.conversation_threads[target.id].set_overrides(
+                            temperature, top_p, frequency_penalty, presence_penalty
+                        )
+                        opener = (
+                            (
+                                opener_file.get("text", "error getting text")
+                                + opener
                             )
-                            presence_penalty = opener_file.get("presence_penalty", None)
-                            self.conversation_threads[target.id].set_overrides(
-                                temperature, top_p, frequency_penalty, presence_penalty
-                            )
-                            if (
-                                not opener
-                            ):  # if we only use opener_file then only pass on opener_file for the opening prompt
-                                opener = opener_file.get("text", "error getting text")
-                            else:
-                                opener = (
-                                    opener_file.get("text", "error getting text")
-                                    + opener
-                                )
-                        except Exception:  # Parse as just regular text
-                            if not opener:
-                                opener = opener_file
-                            else:
-                                opener = opener_file + opener
-                    except Exception:
-                        opener_file = None  # Just start a regular thread if the file fails to load
+                            if opener
+                            else opener_file.get("text", "error getting text")
+                        )
+                    except Exception:  # Parse as just regular text
+                        opener = opener_file + opener if opener else opener_file
+                except Exception:
+                    opener_file = None  # Just start a regular thread if the file fails to load
 
         # Append the starter text for gpt3 to the user's history so it gets concatenated with the prompt later
         if minimal or opener_file or opener:
             self.conversation_threads[target.id].history.append(
                 EmbeddedConversationItem(self.CONVERSATION_STARTER_TEXT_MINIMAL, 0)
             )
-        elif not minimal:
+        else:
             self.conversation_threads[target.id].history.append(
                 EmbeddedConversationItem(self.CONVERSATION_STARTER_TEXT, 0)
             )
@@ -1254,12 +1235,7 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
             return
 
         # If only one of the options are set, then this is invalid.
-        if (
-            parameter is None
-            and value is not None
-            or parameter is not None
-            and value is None
-        ):
+        if parameter is None or value is None:
             await ctx.respond(
                 "Invalid settings command. Please use `/settings <parameter> <value>` to change a setting"
             )
@@ -1304,7 +1280,7 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
         tokens = self.model.usage_service.count_tokens(prompt)
         if tokens > self.model.max_tokens - 1000:
             await ctx.respond(
-                f"This message is too long to paraphrase.",
+                "This message is too long to paraphrase.",
                 ephemeral=True,
                 delete_after=10,
             )
@@ -1333,7 +1309,7 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
         tokens = self.model.usage_service.count_tokens(prompt)
         if tokens > self.model.max_tokens - 500:
             await ctx.respond(
-                f"This message is too long to elaborate on.",
+                "This message is too long to elaborate on.",
                 ephemeral=True,
                 delete_after=10,
             )
@@ -1355,7 +1331,7 @@ class GPT3ComCon(discord.Cog, name="GPT3ComCon"):
         user = ctx.user
         prompt = await self.mention_to_username(ctx, message.content)
         from_other_action = (
-            "Message at message link: " + message.jump_url + "\nSummarized:"
+            f"Message at message link: {message.jump_url}" + "\nSummarized:"
         )
 
         # Construct the paraphrase prompt
@@ -1413,9 +1389,9 @@ class ShareButton(discord.ui.Button["ShareView"]):
         try:
             id = await self.converser_cog.sharegpt_service.format_and_share(
                 self.converser_cog.full_conversation_history[self.conversation_id],
-                self.converser_cog.bot.user.default_avatar.url
-                if not self.converser_cog.bot.user.avatar
-                else self.converser_cog.bot.user.avatar.url,
+                self.converser_cog.bot.user.avatar.url
+                if self.converser_cog.bot.user.avatar
+                else self.converser_cog.bot.user.default_avatar.url,
             )
             url = f"https://shareg.pt/{id}"
             await interaction.response.send_message(
@@ -1425,7 +1401,7 @@ class ShareButton(discord.ui.Button["ShareView"]):
             traceback.print_exc()
             await interaction.response.send_message(
                 embed=EmbedStatics.get_conversation_share_failed_embed(
-                    "The ShareGPT API returned an error: " + str(e)
+                    f"The ShareGPT API returned an error: {str(e)}"
                 ),
                 ephemeral=True,
                 delete_after=15,

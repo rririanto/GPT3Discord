@@ -21,7 +21,7 @@ def app_root_path():
 env_paths = [Path(".env"), app_root_path() / "etc/environment", None]
 
 for env_path in env_paths:
-    print("Loading environment from " + str(env_path))
+    print(f"Loading environment from {str(env_path)}")
     load_dotenv(dotenv_path=env_path)
 
 
@@ -46,9 +46,7 @@ class EnvService:
     @staticmethod
     def save_path():
         share_dir = os.getenv("SHARE_DIR")
-        if share_dir is not None:
-            return Path(share_dir)
-        return app_root_path()
+        return Path(share_dir) if share_dir is not None else app_root_path()
 
     @staticmethod
     def find_shared_file(file_name):
@@ -301,9 +299,7 @@ class EnvService:
     def get_user_input_api_keys():
         try:
             user_input_api_keys = os.getenv("USER_INPUT_API_KEYS")
-            if user_input_api_keys.lower().strip() == "true":
-                return True
-            return False
+            return user_input_api_keys.lower().strip() == "true"
         except Exception:
             return False
 
@@ -311,9 +307,7 @@ class EnvService:
     def get_premoderate():
         try:
             pre_moderate = os.getenv("PRE_MODERATE")
-            if pre_moderate.lower().strip() == "true":
-                return True
-            return False
+            return pre_moderate.lower().strip() == "true"
         except Exception:
             return False
 
@@ -321,17 +315,14 @@ class EnvService:
     def get_force_english():
         try:
             force_english = os.getenv("FORCE_ENGLISH")
-            if force_english.lower().strip() == "true":
-                return True
-            return False
+            return force_english.lower().strip() == "true"
         except Exception:
             return False
 
     @staticmethod
     def get_custom_bot_name():
         try:
-            custom_bot_name = os.getenv("CUSTOM_BOT_NAME") + ": "
-            return custom_bot_name
+            return os.getenv("CUSTOM_BOT_NAME") + ": "
         except Exception:
             return "GPTie: "
 
@@ -339,9 +330,7 @@ class EnvService:
     def get_health_service_enabled():
         try:
             user_input_api_keys = os.getenv("HEALTH_SERVICE_ENABLED")
-            if user_input_api_keys.lower().strip() == "true":
-                return True
-            return False
+            return user_input_api_keys.lower().strip() == "true"
         except Exception:
             return False
 
@@ -349,9 +338,7 @@ class EnvService:
     def get_bot_is_taggable():
         try:
             user_input_api_keys = os.getenv("BOT_TAGGABLE")
-            if user_input_api_keys.lower().strip() == "true":
-                return True
-            return False
+            return user_input_api_keys.lower().strip() == "true"
         except Exception:
             return False
 
@@ -359,9 +346,7 @@ class EnvService:
     def get_user_key_db_path() -> Union[Path, None]:
         try:
             user_key_db_path = os.getenv("USER_KEY_DB_PATH")
-            if user_key_db_path is None:
-                return None
-            return Path(user_key_db_path)
+            return None if user_key_db_path is None else Path(user_key_db_path)
         except Exception:
             return None
 
@@ -381,11 +366,9 @@ class EnvService:
                     "No user key database path was provided. Defaulting to user_key_db.sqlite"
                 )
                 user_key_db_path = EnvService.find_shared_file("user_key_db.sqlite")
-            else:
-                # append "user_key_db.sqlite" to USER_KEY_DB_PATH if it doesn't already end with .sqlite
-                if not user_key_db_path.match("*.sqlite"):
-                    # append "user_key_db.sqlite" to USER_KEY_DB_PATH
-                    user_key_db_path = user_key_db_path / "user_key_db.sqlite"
+            elif not user_key_db_path.match("*.sqlite"):
+                # append "user_key_db.sqlite" to USER_KEY_DB_PATH
+                user_key_db_path = user_key_db_path / "user_key_db.sqlite"
             user_key_db = SqliteDict(user_key_db_path)
             print("Retrieved/created the user key database")
             return user_key_db
@@ -420,16 +403,14 @@ class EnvService:
     @staticmethod
     def get_deepl_token():
         try:
-            deepl_token = os.getenv("DEEPL_TOKEN")
-            return deepl_token
+            return os.getenv("DEEPL_TOKEN")
         except Exception:
             return None
 
     @staticmethod
     def get_openai_token():
         try:
-            openai_token = os.getenv("OPENAI_TOKEN")
-            return openai_token
+            return os.getenv("OPENAI_TOKEN")
         except Exception:
             raise ValueError(
                 "OPENAI_TOKEN is not defined properly in the environment file! The bot cannot start without this token."
@@ -438,47 +419,41 @@ class EnvService:
     @staticmethod
     def get_openai_organization():
         try:
-            openai_org = os.getenv("OPENAI_ORGANIZATION")
-            return openai_org
+            return os.getenv("OPENAI_ORGANIZATION")
         except Exception:
             return None
 
     @staticmethod
     def get_google_search_api_key():
         try:
-            google_search_api_key = os.getenv("GOOGLE_SEARCH_API_KEY")
-            return google_search_api_key
+            return os.getenv("GOOGLE_SEARCH_API_KEY")
         except Exception:
             return None
 
     @staticmethod
     def get_google_search_engine_id():
         try:
-            google_search_engine_id = os.getenv("GOOGLE_SEARCH_ENGINE_ID")
-            return google_search_engine_id
+            return os.getenv("GOOGLE_SEARCH_ENGINE_ID")
         except Exception:
             return None
 
     @staticmethod
     def get_pinecone_region():
         try:
-            pinecone_region = os.getenv("PINECONE_REGION")
-            return pinecone_region
+            return os.getenv("PINECONE_REGION")
         except Exception:
             return "us-west1-gcp"
 
     @staticmethod
     def get_max_search_price():
         try:
-            search_price = float(os.getenv("MAX_SEARCH_PRICE"))
-            return search_price
+            return float(os.getenv("MAX_SEARCH_PRICE"))
         except Exception:
             return 1.00
 
     @staticmethod
     def get_max_deep_compose_price():
         try:
-            deep_compose_price = float(os.getenv("MAX_DEEP_COMPOSE_PRICE"))
-            return deep_compose_price
+            return float(os.getenv("MAX_DEEP_COMPOSE_PRICE"))
         except Exception:
             return 3.00

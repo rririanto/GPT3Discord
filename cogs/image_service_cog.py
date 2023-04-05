@@ -51,9 +51,10 @@ class DrawDallEService(discord.Cog, name="DrawDallEService"):
         await ctx.defer()
 
         # Check the opener for bad content.
-        if PRE_MODERATE:
-            if await Moderation.simple_moderate_and_respond(prompt, ctx):
-                return
+        if PRE_MODERATE and await Moderation.simple_moderate_and_respond(
+            prompt, ctx
+        ):
+            return
 
         user = ctx.user
 

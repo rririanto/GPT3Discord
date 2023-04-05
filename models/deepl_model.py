@@ -37,10 +37,9 @@ class TranslationModel:
     def __init__(self):
         self.deepl_token = os.getenv("DEEPL_TOKEN")
 
-    def backoff_handler(details):
+    def backoff_handler(self):
         print(
-            f"Backing off {details['wait']:0.1f} seconds after {details['tries']} tries calling function {details['target']} | "
-            f"{details['exception'].status}: {details['exception'].message}"
+            f"Backing off {self['wait']:0.1f} seconds after {self['tries']} tries calling function {self['target']} | {self['exception'].status}: {self['exception'].message}"
         )
 
     @backoff.on_exception(
@@ -84,9 +83,9 @@ class TranslationModel:
     def get_all_country_names(lower=False):
         """Get a list of all the country names"""
         return (
-            list(COUNTRY_CODES.values())
-            if not lower
-            else [name.lower() for name in COUNTRY_CODES.values()]
+            [name.lower() for name in COUNTRY_CODES.values()]
+            if lower
+            else list(COUNTRY_CODES.values())
         )
 
     @staticmethod

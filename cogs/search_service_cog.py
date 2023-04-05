@@ -59,9 +59,9 @@ class SearchService(discord.Cog, name="SearchService"):
         for count, chunk in enumerate(response_text, start=1):
             if not first:
                 page = discord.Embed(
-                    title="Search Results"
-                    if not original_link
-                    else "Follow-up results",
+                    title="Follow-up results"
+                    if original_link
+                    else "Search Results",
                     description=chunk,
                     url=original_link,
                 )
@@ -97,12 +97,13 @@ class SearchService(discord.Cog, name="SearchService"):
         followup_user=None,
     ):
         """Command handler for the search command"""
-        await ctx.defer() if not redo else None
+        None if redo else await ctx.defer()
 
         # Check the opener for bad content.
-        if PRE_MODERATE:
-            if await Moderation.simple_moderate_and_respond(query, ctx):
-                return
+        if PRE_MODERATE and await Moderation.simple_moderate_and_respond(
+            query, ctx
+        ):
+            return
 
         user_api_key = None
         if USER_INPUT_API_KEYS:
@@ -118,8 +119,8 @@ class SearchService(discord.Cog, name="SearchService"):
         ):
             await ctx.respond(
                 embed=EmbedStatics.get_search_failure_embed(
-                    str("The search service is not enabled on this server.")
-                ),
+                    "The search service is not enabled on this server."
+                )
             )
             return
 
@@ -174,7 +175,7 @@ class SearchService(discord.Cog, name="SearchService"):
         # helper
         embed_pages = await self.paginate_embed(
             query_response_message,
-            ctx.user if not followup_user else followup_user,
+            followup_user or ctx.user,
             original_link if from_followup else None,
         )
         paginator = pages.Paginator(

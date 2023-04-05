@@ -17,7 +17,7 @@ model = Model(usage_service)
 class Settings_autocompleter:
     """autocompleter for the settings command"""
 
-    async def get_settings(ctx: discord.AutocompleteContext):
+    async def get_settings(self):
         """get settings for the settings option"""
         SETTINGS = [
             re.sub("^_", "", key)
@@ -30,9 +30,7 @@ class Settings_autocompleter:
             if parameter.startswith(ctx.value.lower())
         ][:25]
 
-    async def get_value(
-        ctx: discord.AutocompleteContext,
-    ):  # Behaves a bit weird if you go back and edit the parameter without typing in a new command
+    async def get_value(self):    # Behaves a bit weird if you go back and edit the parameter without typing in a new command
         """gets valid values for the value option"""
         values = {
             "max_conversation_length": [
@@ -79,36 +77,31 @@ class Settings_autocompleter:
             ],
             "type": ["warn", "delete"],
         }
-        options = values.get(ctx.options["parameter"], [])
-        if options:
+        if options := values.get(self.options["parameter"], []):
             return [value for value in options if value.startswith(ctx.value.lower())]
 
-        await ctx.interaction.response.defer()  # defer so the autocomplete in int values doesn't error but rather just says not found
+        await self.interaction.response.defer()
         return []
 
-    async def get_models(
-        ctx: discord.AutocompleteContext,
-    ):
+    async def get_models(self):
         """Gets all models"""
-        models = [
-            value for value in Models.TEXT_MODELS if value.startswith(ctx.value.lower())
+        return [
+            value
+            for value in Models.TEXT_MODELS
+            if value.startswith(ctx.value.lower())
         ]
-        return models
 
-    async def get_converse_models(
-        ctx: discord.AutocompleteContext,
-    ):
+    async def get_converse_models(self):
         """Gets all models"""
-        models = [
-            value for value in Models.TEXT_MODELS if value.startswith(ctx.value.lower())
+        return [
+            value
+            for value in Models.TEXT_MODELS
+            if value.startswith(ctx.value.lower())
         ]
-        return models
 
-    async def get_value_moderations(
-        ctx: discord.AutocompleteContext,
-    ):  # Behaves a bit weird if you go back and edit the parameter without typing in a new command
+    async def get_value_moderations(self):    # Behaves a bit weird if you go back and edit the parameter without typing in a new command
         """gets valid values for the type option"""
-        print(f"The value is {ctx.value}")
+        print(f"The value is {self.value}")
         return [
             value
             for value in ModerationOptions.OPTIONS
@@ -127,7 +120,7 @@ class Settings_autocompleter:
 class Translations_autocompleter:
     """autocompleter for the translations command"""
 
-    async def get_languages(ctx: discord.AutocompleteContext):
+    async def get_languages(self):
         """gets valid values for the language option"""
         return [
             language
@@ -147,7 +140,7 @@ class Translations_autocompleter:
 class File_autocompleter:
     """Autocompleter for the opener command"""
 
-    async def get_openers(ctx: discord.AutocompleteContext):
+    async def get_openers(self):
         """get all files in the openers folder"""
         try:
             return [
@@ -160,7 +153,7 @@ class File_autocompleter:
         except Exception:
             return ["No 'openers' folder"]
 
-    async def get_user_indexes(ctx: discord.AutocompleteContext):
+    async def get_user_indexes(self):
         """get all files in the indexes folder"""
         try:
             return [
@@ -177,7 +170,7 @@ class File_autocompleter:
         except Exception:
             return ["No user indexes found, add an index"]
 
-    async def get_server_indexes(ctx: discord.AutocompleteContext):
+    async def get_server_indexes(self):
         """get all files in the indexes folder"""
         try:
             return [
@@ -194,7 +187,7 @@ class File_autocompleter:
         except Exception:
             return ["No server indexes found, add an index"]
 
-    async def get_user_search_indexes(ctx: discord.AutocompleteContext):
+    async def get_user_search_indexes(self):
         """get all files in the indexes folder"""
         try:
             return [

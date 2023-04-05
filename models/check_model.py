@@ -19,7 +19,9 @@ class Check:
             if ADMIN_ROLES == [None]:
                 return True
 
-            if not any(role.name.lower() in ADMIN_ROLES for role in ctx.user.roles):
+            if all(
+                role.name.lower() not in ADMIN_ROLES for role in ctx.user.roles
+            ):
                 await ctx.defer(ephemeral=True)
                 await ctx.respond(
                     f"You don't have permission, list of roles is {ADMIN_ROLES}",
@@ -36,7 +38,9 @@ class Check:
         async def inner(ctx: discord.ApplicationContext):
             if DALLE_ROLES == [None]:
                 return True
-            if not any(role.name.lower() in DALLE_ROLES for role in ctx.user.roles):
+            if all(
+                role.name.lower() not in DALLE_ROLES for role in ctx.user.roles
+            ):
                 await ctx.defer(ephemeral=True)
                 await ctx.respond(
                     f"You don't have permission, list of roles is {DALLE_ROLES}",
@@ -53,7 +57,7 @@ class Check:
         async def inner(ctx: discord.ApplicationContext):
             if GPT_ROLES == [None]:
                 return True
-            if not any(role.name.lower() in GPT_ROLES for role in ctx.user.roles):
+            if all(role.name.lower() not in GPT_ROLES for role in ctx.user.roles):
                 await ctx.defer(ephemeral=True)
                 await ctx.respond(
                     f"You don't have permission, list of roles is {GPT_ROLES}",
@@ -70,7 +74,9 @@ class Check:
         async def inner(ctx: discord.ApplicationContext):
             if INDEX_ROLES == [None]:
                 return True
-            if not any(role.name.lower() in INDEX_ROLES for role in ctx.user.roles):
+            if all(
+                role.name.lower() not in INDEX_ROLES for role in ctx.user.roles
+            ):
                 await ctx.defer(ephemeral=True)
                 await ctx.respond(
                     f"You don't have permission, list of roles is {INDEX_ROLES}",
@@ -87,8 +93,9 @@ class Check:
         async def inner(ctx: discord.ApplicationContext):
             if TRANSLATOR_ROLES == [None]:
                 return True
-            if not any(
-                role.name.lower() in TRANSLATOR_ROLES for role in ctx.user.roles
+            if all(
+                role.name.lower() not in TRANSLATOR_ROLES
+                for role in ctx.user.roles
             ):
                 await ctx.defer(ephemeral=True)
                 await ctx.respond(
@@ -106,7 +113,9 @@ class Check:
         async def inner(ctx: discord.ApplicationContext):
             if SEARCH_ROLES == [None]:
                 return True
-            if not any(role.name.lower() in SEARCH_ROLES for role in ctx.user.roles):
+            if all(
+                role.name.lower() not in SEARCH_ROLES for role in ctx.user.roles
+            ):
                 await ctx.defer(ephemeral=True)
                 await ctx.respond(
                     f"You don't have permission, list of roles is {SEARCH_ROLES}",
